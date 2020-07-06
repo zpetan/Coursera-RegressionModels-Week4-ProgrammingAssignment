@@ -1,0 +1,102 @@
+---
+title: "Practical Machine Learning - Week 4 Assignment"
+output: html_document
+---
+
+
+# Prediction of correct activity movement
+
+
+This report contains a prediction model on activity data (barbell lifts) from wearables. The goal of the model is to predict the outcome whether the activity is correct/incorrect.
+
+
+## Load and clean data
+
+The datasets are loaded and columns containing NA's or non-relevant information are removed
+
+```{r}
+library(readr)
+
+# Load training/test set data
+test <- read_csv("pml-testing.csv")
+train <- read_csv("pml-training.csv")
+
+
+# Remove NA variables from test and trainig set
+train <- train[, colSums(is.na(test)) != nrow(test)]
+test <- test[, colSums(is.na(test)) != nrow(test)]
+
+# Remove names/ timestamp / window related columns
+train  <-  subset(train, select = -c(1,2,3,4,5,6,7))
+test  <-  subset(test, select = -c(1,2,3,4,5,6,7)) 
+
+# Split variables and outcomes
+train_Y <- subset(train, select = c(53))
+
+train_Y$classe <- as.factor(train_Y$classe)
+
+train_X <- subset(train, select = -c(53))
+
+test_X <- subset(test, select = -c(53))
+
+```
+
+We look into the dataset in more detail.
+
+```{r}
+# Dimensions of training data set
+dim(train_X)
+
+# Number of unique outcomes
+unique(train_Y$classe)
+
+```
+## Random Forest
+
+We use a random forest model with 10-fold cross validation on the training set.
+
+```{r}
+library(caret)
+library(randomForest)
+
+set.seed(1)
+
+
+# Use 10-fold cross validation
+settings <- trainControl(method="cv", number=10, verboseIter=FALSE)
+
+rfModel <- randomForest(x = train_X, y = train_Y$classe,
+                        method = "rf",
+                        trControl = settings)
+
+```
+
+We check the accuracy of the trained model against the training set.
+
+```{r}
+
+predictRF <- predict(rfModel, newdata=train_X)
+confMatRF <- confusionMatrix(predictRF, train_Y$classe)
+confMatRF
+
+plot(confMatRF$table, col = confMatRF$byClass, 
+     main = paste("RF- Accuracy =", round(confMatRF$overall['Accuracy'], 2)))
+
+
+```
+
+
+
+We now predict the test set:
+```{r}
+
+predictRF_test <- predict(rfModel, newdata=test_X)
+ 
+head(predictRF_test,20)
+
+```
+
+## Note:
+
+The random forest model gives a very good accuracy at the expense of interpretability of the model.
+Considering the large amount of variables, it may be a good approach to also check other model approaches that reduce the amount of (correlated) variables in the model. Such as regression over principal components, or PLSDA.
